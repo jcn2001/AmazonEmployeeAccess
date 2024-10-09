@@ -6,10 +6,9 @@ library(ggmosaic)
 library(embed)
 
 amazon_train_data <- vroom("C:/Users/Josh/Documents/stat348/AmazonEmployee/amazon-employee-access-challenge/train.csv")
+amazon_test_data <- vroom("C:/Users/Josh/Documents/stat348/AmazonEmployee/amazon-employee-access-challenge/test.csv")
 
 glimpse(amazon_train_data)
-## 1050  
-
 length(unique(amazon_train_data$ROLE_CODE))
 
 ## make some bar plots for top 10 categories of department and family
@@ -53,3 +52,28 @@ first_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
 
 prep_amazon <- amazon_prepped_recipe <- prep(first_recipe)
 baked_amazon <- bake(amazon_prepped_recipe, new_data=amazon_train_data)
+
+
+## let's try our first model  (logistic regression) hw 14
+amazon_train_data <- amazon_train_data %>%
+  mutate(ACTION = factor(ACTION))
+
+logRegModel <- logistic_reg() %>%
+  set_engine("glm")
+
+log_wf <- workflow() %>%
+  add_recipe(first_recipe) %>%
+  add_model(logRegModel) %>%
+  fit(data=amazon_train_data)
+  
+log_predictions <- predict(log_wf,
+                           new_data=amazon_test_data,
+                           type="prob")
+
+
+logistic_submission <- log_predictions %>%
+  bind_cols(.,amazon_test_data) %>%
+  select(id, .pred_1) %>%
+  rename(ACTION=.pred_1)
+
+vroom_write(x=logistic_submission, file ="C:/Users/Josh/Documents/stat348/AmazonEmployee/amazon-employee-access-challenge/LogisticPreds.csv", delim=",")
