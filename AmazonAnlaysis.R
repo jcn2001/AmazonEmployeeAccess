@@ -50,7 +50,7 @@ first_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
   step_other(all_nominal_predictors(), threshold = 0.001) %>%
   step_dummy(all_nominal_predictors())
 
-prep_amazon <- amazon_prepped_recipe <- prep(first_recipe)
+amazon_prepped_recipe <- prep(first_recipe)
 baked_amazon <- bake(amazon_prepped_recipe, new_data=amazon_train_data)
 
 
@@ -77,3 +77,47 @@ logistic_submission <- log_predictions %>%
   rename(ACTION=.pred_1)
 
 vroom_write(x=logistic_submission, file ="C:/Users/Josh/Documents/stat348/AmazonEmployee/amazon-employee-access-challenge/LogisticPreds.csv", delim=",")
+
+## HW 15 Penalized Logistic Regression
+log_pen_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
+  step_mutate_at(all_numeric_predictors(), fn = factor) %>%
+  step_other(all_nominal_predictors(), threshold = 0.001) %>%
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>%
+  step_normalize(all_numeric_predictors())
+
+log_pen_model <- logistic_reg(mixture=tune(),penalty=tune()) %>%
+  set_engine("glmnet")
+
+log_pen_workflow <- workflow() %>%
+  add_recipe(log_pen_recipe) %>%
+  add_model(log_pen_model)
+
+log_pen_tuning_grid <- grid_regular(penalty(),
+                                    mixture(),
+                                    levels = 10)
+
+log_pen_folds <- vfold_cv(amazon_train_data, v = 10, repeats= 1)
+
+log_pen_CV_results <- log_pen_workflow %>%
+  tune_grid(resamples=log_pen_folds,
+            grid=log_pen_tuning_grid,
+            metrics=metric_set(roc_auc))
+
+best_log_pen_tune <- log_pen_CV_results %>%
+  select_best(metric = "roc_auc")
+
+final_log_pen_wf <-
+  log_pen_workflow %>%
+  finalize_workflow(best_log_pen_tune) %>%
+  fit(data=amazon_train_data)
+
+log_pen_predictions <- predict(final_log_pen_wf,
+                           new_data=amazon_test_data,
+                           type="prob")
+
+logistic_pen_submission <- log_pen_predictions %>%
+  bind_cols(.,amazon_test_data) %>%
+  select(id, .pred_1) %>%
+  rename(ACTION=.pred_1)
+
+vroom_write(x=logistic_pen_submission, file ="C:/Users/Josh/Documents/stat348/AmazonEmployee/amazon-employee-access-challenge/Logistic_Pen_Preds.csv", delim=",")
