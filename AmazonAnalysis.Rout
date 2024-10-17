@@ -1,0 +1,238 @@
+
+R version 4.3.3 (2024-02-29) -- "Angel Food Cake"
+Copyright (C) 2024 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(tidyverse)
+── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+✔ dplyr     1.1.4     ✔ readr     2.1.5
+✔ forcats   1.0.0     ✔ stringr   1.5.1
+✔ ggplot2   3.5.1     ✔ tibble    3.2.1
+✔ lubridate 1.9.3     ✔ tidyr     1.3.1
+✔ purrr     1.0.2     
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+> library(tidymodels)
+── Attaching packages ────────────────────────────────────── tidymodels 1.2.0 ──
+✔ broom        1.0.7     ✔ rsample      1.2.1
+✔ dials        1.3.0     ✔ tune         1.2.1
+✔ infer        1.0.7     ✔ workflows    1.1.4
+✔ modeldata    1.4.0     ✔ workflowsets 1.1.0
+✔ parsnip      1.2.1     ✔ yardstick    1.3.1
+✔ recipes      1.1.0     
+── Conflicts ───────────────────────────────────────── tidymodels_conflicts() ──
+✖ scales::discard() masks purrr::discard()
+✖ dplyr::filter()   masks stats::filter()
+✖ recipes::fixed()  masks stringr::fixed()
+✖ dplyr::lag()      masks stats::lag()
+✖ yardstick::spec() masks readr::spec()
+✖ recipes::step()   masks stats::step()
+• Search for functions across packages at https://www.tidymodels.org/find/
+> library(vroom)
+
+Attaching package: ‘vroom’
+
+The following object is masked from ‘package:yardstick’:
+
+    spec
+
+The following object is masked from ‘package:scales’:
+
+    col_factor
+
+The following objects are masked from ‘package:readr’:
+
+    as.col_spec, col_character, col_date, col_datetime, col_double,
+    col_factor, col_guess, col_integer, col_logical, col_number,
+    col_skip, col_time, cols, cols_condense, cols_only, date_names,
+    date_names_lang, date_names_langs, default_locale, fwf_cols,
+    fwf_empty, fwf_positions, fwf_widths, locale, output_column,
+    problems, spec
+
+> library(ggplot2)
+> library(embed)
+> 
+> amazon_train_data <- vroom("./train.csv")
+Rows: 32769 Columns: 10
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+dbl (10): ACTION, RESOURCE, MGR_ID, ROLE_ROLLUP_1, ROLE_ROLLUP_2, ROLE_DEPTN...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+> amazon_test_data <- vroom("./test.csv")
+Rows: 58921 Columns: 10
+── Column specification ────────────────────────────────────────────────────────
+Delimiter: ","
+dbl (10): id, RESOURCE, MGR_ID, ROLE_ROLLUP_1, ROLE_ROLLUP_2, ROLE_DEPTNAME,...
+
+ℹ Use `spec()` to retrieve the full column specification for this data.
+ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+> 
+> glimpse(amazon_train_data)
+Rows: 32,769
+Columns: 10
+$ ACTION           <dbl> 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,…
+$ RESOURCE         <dbl> 39353, 17183, 36724, 36135, 42680, 45333, 25993, 1966…
+$ MGR_ID           <dbl> 85475, 1540, 14457, 5396, 5905, 14561, 17227, 4209, 7…
+$ ROLE_ROLLUP_1    <dbl> 117961, 117961, 118219, 117961, 117929, 117951, 11796…
+$ ROLE_ROLLUP_2    <dbl> 118300, 118343, 118220, 118343, 117930, 117952, 11834…
+$ ROLE_DEPTNAME    <dbl> 123472, 123125, 117884, 119993, 119569, 118008, 12347…
+$ ROLE_TITLE       <dbl> 117905, 118536, 117879, 118321, 119323, 118568, 11898…
+$ ROLE_FAMILY_DESC <dbl> 117906, 118536, 267952, 240983, 123932, 118568, 30153…
+$ ROLE_FAMILY      <dbl> 290919, 308574, 19721, 290919, 19793, 19721, 118295, …
+$ ROLE_CODE        <dbl> 117908, 118539, 117880, 118322, 119325, 118570, 11898…
+> length(unique(amazon_train_data$ROLE_CODE))
+[1] 343
+> 
+> ## make some bar plots for top 10 categories of department and family
+> summary_amazon_family <- amazon_train_data %>%
++   group_by(ROLE_FAMILY) %>%
++   summarise(Count = n(), .groups = 'drop')
+> summary_amazon_dept <- amazon_train_data %>%
++   group_by(ROLE_DEPTNAME) %>%
++   summarise(Count = n(), .groups = 'drop')
+> top_categories_family <- summary_amazon_family %>%
++   group_by(ROLE_FAMILY) %>%
++   summarise(Total = sum(Count), .groups = 'drop') %>%
++   top_n(10, Total)
+> top_categories_dept <- summary_amazon_dept %>%
++   group_by(ROLE_DEPTNAME) %>%
++   summarise(Total = sum(Count), .groups = 'drop') %>%
++   top_n(10, Total)
+> 
+> ggplot(top_categories_family, aes(x = reorder(ROLE_FAMILY, -Total), y = Total)) +
++   geom_bar(stat = "identity", position = "dodge") +
++   coord_flip() +  # Flip the axes for better readability
++   labs(title = "Count of Outcomes by Family",
++        x = "ROLE_FAMILY",
++        y = "Count") +
++   theme_minimal()
+> 
+> ggplot(top_categories_dept, aes(x = reorder(ROLE_DEPTNAME, -Total), y = Total)) +
++   geom_bar(stat = "identity", position = "dodge") +
++   coord_flip() +  # Flip the axes for better readability
++   labs(title = "Count of Outcomes by Department",
++        x = "ROLE_DEPTNAME",
++        y = "Count") +
++   theme_minimal()
+> 
+> 
+> # make the other category for those with less than .1% of the observations and make dummy variables
+> amazon_train_data <- amazon_train_data %>%
++   mutate(ACTION = factor(ACTION))
+> 
+> first_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
++   step_mutate_at(all_numeric_predictors(), fn = factor) %>%
++   step_other(all_nominal_predictors(), threshold = 0.001) %>%
++   step_dummy(all_nominal_predictors())
+> 
+> amazon_prepped_recipe <- prep(first_recipe)
+> baked_amazon <- bake(amazon_prepped_recipe, new_data=amazon_train_data)
+> 
+> 
+> ## let's try our first model  (logistic regression) hw 14
+> logRegModel <- logistic_reg() %>%
++   set_engine("glm")
+> 
+> log_wf <- workflow() %>%
++   add_recipe(first_recipe) %>%
++   add_model(logRegModel) %>%
++   fit(data=amazon_train_data)
+Warning message:
+glm.fit: fitted probabilities numerically 0 or 1 occurred 
+>   
+> log_predictions <- predict(log_wf,
++                            new_data=amazon_test_data,
++                            type="prob")
+> 
+> 
+> logistic_submission <- log_predictions %>%
++   bind_cols(.,amazon_test_data) %>%
++   select(id, .pred_1) %>%
++   rename(ACTION=.pred_1)
+> 
+> vroom_write(x=logistic_submission, file ="./LogisticPreds.csv", delim=",")
+> 
+> ## HW 15 Penalized Logistic Regression
+> log_pen_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
++   step_mutate_at(all_numeric_predictors(), fn = factor) %>%
++   ## step_other(all_nominal_predictors(), threshold = 0.001)
++   step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>%
++   step_normalize(all_numeric_predictors())
+> 
+> log_pen_model <- logistic_reg(mixture=tune(),penalty=tune()) %>%
++   set_engine("glmnet")
+> 
+> log_pen_workflow <- workflow() %>%
++   add_recipe(log_pen_recipe) %>%
++   add_model(log_pen_model)
+> 
+> log_pen_tuning_grid <- grid_regular(penalty(),
++                                     mixture(),
++                                     levels = 10)
+> 
+> log_pen_folds <- vfold_cv(amazon_train_data, v = 10, repeats= 1)
+> 
+> log_pen_CV_results <- log_pen_workflow %>%
++   tune_grid(resamples=log_pen_folds,
++             grid=log_pen_tuning_grid,
++             metrics=metric_set(roc_auc))
+→ A | warning: Model failed to converge with max|grad| = 0.419542 (tol = 0.002, component 1), Model is nearly unidentifiable: very large eigenvalue
+                - Rescale variables?
+There were issues with some computations   A: x1
+→ B | warning: Model failed to converge with max|grad| = 0.344227 (tol = 0.002, component 1), Model is nearly unidentifiable: very large eigenvalue
+                - Rescale variables?
+There were issues with some computations   A: x1There were issues with some computations   A: x1   B: x1
+→ C | warning: Model failed to converge with max|grad| = 0.341179 (tol = 0.002, component 1), Model is nearly unidentifiable: very large eigenvalue
+                - Rescale variables?
+There were issues with some computations   A: x1   B: x1There were issues with some computations   A: x1   B: x1   C: x1
+→ D | warning: Model failed to converge with max|grad| = 0.327687 (tol = 0.002, component 1)
+There were issues with some computations   A: x1   B: x1   C: x1There were issues with some computations   A: x1   B: x1   C: x1   D: x1
+→ E | warning: Model failed to converge with max|grad| = 0.420382 (tol = 0.002, component 1), Model is nearly unidentifiable: very large eigenvalue
+                - Rescale variables?
+There were issues with some computations   A: x1   B: x1   C: x1   D: x1There were issues with some computations   A: x1   B: x1   C: x1   D: x1   E: x1
+→ F | warning: Model failed to converge with max|grad| = 0.419796 (tol = 0.002, component 1), Model is nearly unidentifiable: very large eigenvalue
+                - Rescale variables?
+There were issues with some computations   A: x1   B: x1   C: x1   D: x1   E: x1There were issues with some computations   A: x1   B: x1   C: x1   D: x1   E: x…
+There were issues with some computations   A: x1   B: x1   C: x1   D: x1   E: x…
+
+> 
+> best_log_pen_tune <- log_pen_CV_results %>%
++   select_best(metric = "roc_auc")
+> 
+> final_log_pen_wf <-
++   log_pen_workflow %>%
++   finalize_workflow(best_log_pen_tune) %>%
++   fit(data=amazon_train_data)
+> 
+> log_pen_predictions <- predict(final_log_pen_wf,
++                            new_data=amazon_test_data,
++                            type="prob")
+> 
+> logistic_pen_submission <- log_pen_predictions %>%
++   bind_cols(.,amazon_test_data) %>%
++   select(id, .pred_1) %>%
++   rename(ACTION=.pred_1)
+> 
+> vroom_write(x=logistic_pen_submission, file ="./Logistic_Pen_Preds.csv", delim=",")
+> 
+> proc.time()
+    user   system  elapsed 
+1127.544   10.138 1137.618 
