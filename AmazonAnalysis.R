@@ -3,7 +3,7 @@ library(tidymodels)
 library(vroom)
 library(ggplot2)
 library(embed)
-
+setwd("C:/Users/Josh/Documents/stat348/AmazonEmployeeAcess")
 amazon_train_data <- vroom("./train.csv")
 amazon_test_data <- vroom("./test.csv")
 
@@ -176,5 +176,49 @@ knn_submission <- knn_predictions %>%
 
 vroom_write(x=knn_submission, file ="./KNN_Preds.csv", delim=",")
 
+## random forest for a binary response
+install.packages("ranger")
+my_randomforest_model_amazon <- rand_forest(mtry = tune(),
+                                     min_n=tune(),
+                                     trees=500) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
 
+# set workflow
+randomforest_wf_amazon <- workflow() %>%
+  add_recipe(first_recipe) %>%
+  add_model(my_randomforest_model_amazon)
 
+# grid of values to tune over
+grid_of_randomforest_tuning_params_amazon <- grid_regular(mtry(range=c(1,10)),
+                                                   min_n(),
+                                                   levels = 5)
+
+# split data for CV
+randomforest_folds_amazon <- vfold_cv(amazon_train_data, v = 10, repeats=1)
+
+# Run the CV
+randomforest_CV_results_amazon <- randomforest_wf %>%
+  tune_grid(resamples=randomforest_folds_amazon,
+            grid=grid_of_randomforest_tuning_params_amazon,
+            metrics=metric_set(roc_auc))
+
+# Find best tuning parameters
+best_randomforestTune_amazon <- randomforest_CV_results_amazon %>%
+  select_best(metric = "roc_auc")
+
+# Finalize the workflow and fit it
+final_randomforest_wf_amazon <- randomforest_wf_amazon %>%
+  finalize_workflow(best_randomforestTune_amazon) %>%
+  fit(data=amazon_train_data)
+
+randomforest_preds <- predict(final_randomforest_wf, new_data = amazon_test_data, type = "prob")
+
+# create the file to submit to kaggle
+random_forest_submission <- randomforest_preds %>%
+  bind_cols(.,amazon_test_data) %>%
+  select(id, .pred_1) %>%
+  rename(ACTION=.pred_1)
+
+# write out the file
+vroom_write(x=random_forest_submission, file ="./random_forest_Preds.csv", delim=",")
