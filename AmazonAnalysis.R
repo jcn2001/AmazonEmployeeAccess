@@ -260,18 +260,6 @@ nb_CV_results <- nb_wf %>%
 best_nb_tune <- nb_CV_results %>%
   select_best(metric = "roc_auc")
 
-nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
-  set_mode("classification") %>%
-  set_engine("naivebayes")
-
-nb_wf <- workflow() %>%
-  add_recipe(nb_recipe) %>%
-  add_model(nb_model)
-
-final_nb_wf <- nb_wf %>%
-  finalize_workflow(nb_wf) %>%
-  fit(data=amazon_train_data)
-
 # # Finalize the workflow and fit it
 final_nb_wf <- nb_wf %>%
   finalize_workflow(best_nb_tune) %>%
