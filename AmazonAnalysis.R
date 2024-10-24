@@ -3,7 +3,6 @@ library(tidymodels)
 library(vroom)
 library(ggplot2)
 library(embed)
-setwd("C:/Users/Josh/Documents/stat348/AmazonEmployeeAcess")
 amazon_train_data <- vroom("./train.csv")
 amazon_test_data <- vroom("./test.csv")
 
@@ -222,3 +221,71 @@ random_forest_submission <- randomforest_preds %>%
 
 # write out the file
 vroom_write(x=random_forest_submission, file ="./random_forest_Preds.csv", delim=",")
+
+
+## Naive bayes Classifier
+install.packages("discrim")
+install.packages("naivebayes")
+
+# create the recipe
+nb_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
+  step_mutate_at(all_numeric_predictors(), fn = factor) %>%
+  ## step_other(all_nominal_predictors(), threshold = 0.001)
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION))
+
+# nb model 
+nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
+  set_mode("classification") %>%
+  set_engine("naivebayes")
+
+nb_wf <- workflow() %>%
+  add_recipe(nb_recipe) %>%
+  add_model(nb_model)
+
+# tune smoothness and laplace
+# tuning grid
+nb_tuning_grid <- grid_regular(Laplace(),
+                               smoothness(),
+                                levels = 5)
+#folds
+nb_folds <- vfold_cv(amazon_train_data, v = 10, repeats= 1)
+
+# cross-validation
+nb_CV_results <- nb_wf %>%
+  tune_grid(resamples=nb_folds,
+            grid=nb_tuning_grid,
+            metrics=metric_set(roc_auc))
+
+# pick the best tuning parameter
+best_nb_tune <- nb_CV_results %>%
+  select_best(metric = "roc_auc")
+
+nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
+  set_mode("classification") %>%
+  set_engine("naivebayes")
+
+nb_wf <- workflow() %>%
+  add_recipe(nb_recipe) %>%
+  add_model(nb_model)
+
+final_nb_wf <- nb_wf %>%
+  finalize_workflow(nb_wf) %>%
+  fit(data=amazon_train_data)
+
+# # Finalize the workflow and fit it
+final_nb_wf <- nb_wf %>%
+  finalize_workflow(best_nb_tune) %>%
+  fit(data=amazon_train_data)
+
+# make predictions with the model
+nb_preds <- predict(final_nb_wf, new_data = amazon_test_data, type = "prob")
+
+# create the file to submit to kaggle
+nb_submission <- nb_preds %>%
+  bind_cols(.,amazon_test_data) %>%
+  select(id, .pred_1) %>%
+  rename(ACTION=.pred_1)
+
+# write out the file
+vroom_write(x=nb_submission, file ="./nb_Preds.csv", delim=",")
+
