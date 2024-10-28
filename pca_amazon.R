@@ -245,7 +245,7 @@ svm_linear_CV_results <- svm_linear_wf %>%
 best_svm_linear_tune <- svm_linear_CV_results %>%
   select_best(metric = "roc_auc")
 
-# # Finalize the workflow and fit it
+# Finalize the workflow and fit it
 final_svm_linear_wf <- svm_linear_wf %>%
   finalize_workflow(best_svm_linear_tune) %>%
   fit(data=amazon_train_data)
