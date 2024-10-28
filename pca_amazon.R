@@ -141,7 +141,7 @@ grid_of_randomforest_tuning_params_amazon <- grid_regular(mtry(range=c(1,10)),
 randomforest_folds_amazon <- vfold_cv(amazon_train_data, v = 10, repeats=1)
 
 # Run the CV
-randomforest_CV_results_amazon <- randomforest_wf %>%
+randomforest_CV_results_amazon <- randomforest_wf_amazon %>%
   tune_grid(resamples=randomforest_folds_amazon,
             grid=grid_of_randomforest_tuning_params_amazon,
             metrics=metric_set(roc_auc))
@@ -155,7 +155,7 @@ final_randomforest_wf_amazon <- randomforest_wf_amazon %>%
   finalize_workflow(best_randomforestTune_amazon) %>%
   fit(data=amazon_train_data)
 
-randomforest_preds <- predict(final_randomforest_wf, new_data = amazon_test_data, type = "prob")
+randomforest_preds <- predict(final_randomforest_wf_amazon, new_data = amazon_test_data, type = "prob")
 
 # create the file to submit to kaggle
 random_forest_submission <- randomforest_preds %>%
@@ -215,3 +215,96 @@ nb_submission <- nb_preds %>%
 # write out the file
 vroom_write(x=nb_submission, file ="./nb_Preds.csv", delim=",")
 
+
+
+
+## SVM models
+## linear model
+svmLinear <- svm_linear(cost=tune()) %>%
+  set_mode("classification") %>%
+  set_engine("kernlab")
+
+svm_linear_wf <- workflow() %>%
+  add_recipe(pca_recipe) %>%
+  add_model(svmLinear)
+
+# tune degree and cost
+# tuning grid
+svm_linear_tuning_grid <- grid_regular(cost(),
+                               levels = 5)
+#folds
+svm_linear_folds <- vfold_cv(amazon_train_data, v = 10, repeats= 1)
+
+# cross-validation
+svm_linear_CV_results <- svm_linear_wf %>%
+  tune_grid(resamples=svm_linear_folds,
+            grid=svm_linear_tuning_grid,
+            metrics=metric_set(roc_auc))
+
+# pick the best tuning parameter
+best_svm_linear_tune <- svm_linear_CV_results %>%
+  select_best(metric = "roc_auc")
+
+# # Finalize the workflow and fit it
+final_svm_linear_wf <- svm_linear_wf %>%
+  finalize_workflow(best_svm_linear_tune) %>%
+  fit(data=amazon_train_data)
+
+# make predictions with the model
+svm_linear_preds <- predict(final_svm_linear_wf, new_data = amazon_test_data, type = "prob")
+
+# create the file to submit to kaggle
+svm_linear_submission <- svm_linear_preds %>%
+  bind_cols(.,amazon_test_data) %>%
+  select(id, .pred_1) %>%
+  rename(ACTION=.pred_1)
+
+# write out the file
+vroom_write(x=svm_linear_submission, file ="./svm_linear_Preds.csv", delim=",")
+
+
+
+
+## polynomial model
+svmPoly <- svm_poly(degree=tune(), cost=tune()) %>%
+  set_mode("classification") %>%
+  set_engine("kernlab")
+
+svm_poly_wf <- workflow() %>%
+  add_recipe(pca_recipe) %>%
+  add_model(svmPoly)
+
+# tune degree and cost
+# tuning grid
+svm_poly_tuning_grid <- grid_regular(degree(),
+                                       cost(),
+                                       levels = 5)
+#folds
+svm_poly_folds <- vfold_cv(amazon_train_data, v = 10, repeats= 1)
+
+# cross-validation
+svm_poly_CV_results <- svm_poly_wf %>%
+  tune_grid(resamples=svm_poly_folds,
+            grid=svm_poly_tuning_grid,
+            metrics=metric_set(roc_auc))
+
+# pick the best tuning parameter
+best_svm_poly_tune <- svm_poly_CV_results %>%
+  select_best(metric = "roc_auc")
+
+# # Finalize the workflow and fit it
+final_svm_poly_wf <- svm_poly_wf %>%
+  finalize_workflow(best_sv_poly_tune) %>%
+  fit(data=amazon_train_data)
+
+# make predictions with the model
+svm_poly_preds <- predict(final_svm_poly_wf, new_data = amazon_test_data, type = "prob")
+
+# create the file to submit to kaggle
+svm_poly_submission <- svm_poly_preds %>%
+  bind_cols(.,amazon_test_data) %>%
+  select(id, .pred_1) %>%
+  rename(ACTION=.pred_1)
+
+# write out the file
+vroom_write(x=svm_poly_submission, file ="./svm_poly_Preds.csv", delim=",")
