@@ -1,6 +1,7 @@
 library(tidyverse)
 library(tidymodels)
 library(vroom)
+library(themis)
 
 amazon_train_data <- vroom("./train.csv")
 amazon_test_data <- vroom("./test.csv")
@@ -8,17 +9,26 @@ amazon_test_data <- vroom("./test.csv")
 amazon_train_data <- amazon_train_data %>%
   mutate(ACTION = factor(ACTION))
 
+# pca recipe
 pca_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
   step_mutate_at(all_numeric_predictors(), fn = factor) %>%
   step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>%
   step_normalize(all_numeric_predictors()) %>%
   step_pca(all_predictors(), threshold = .85)
 
+## SMOTE recipe
+SMOTE_recipe <- recipe(ACTION~., data=amazon_train_data) %>%
+  step_mutate_at(all_numeric_predictors(), fn = factor) %>%
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION)) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_pca(all_predictors(), threshold = .85) %>%
+  step_smote(all_outcomes(), neighbors=4)
+
 logRegModel <- logistic_reg() %>%
   set_engine("glm")
 
 log_wf <- workflow() %>%
-  add_recipe(pca_recipe) %>%
+  add_recipe(SMOTE_recipe) %>%
   add_model(logRegModel) %>%
   fit(data=amazon_train_data)
 
@@ -38,7 +48,7 @@ log_pen_model <- logistic_reg(mixture=tune(),penalty=tune()) %>%
   set_engine("glmnet")
 
 log_pen_workflow <- workflow() %>%
-  add_recipe(pca_recipe) %>%
+  add_recipe(SMOTE_recipe) %>%
   add_model(log_pen_model)
 
 log_pen_tuning_grid <- grid_regular(penalty(),
@@ -82,7 +92,7 @@ knn_model <- nearest_neighbor(neighbors=tune()) %>%
 
 # workflow
 knn_wf <- workflow() %>%
-  add_recipe(pca_recipe) %>%
+  add_recipe(SMOTE_recipe) %>%
   add_model(knn_model)
 
 # tuning grid
@@ -111,6 +121,7 @@ final_knn_wf <-
 knn_predictions <- predict(final_knn_wf,
                            new_data=amazon_test_data,
                            type="prob")
+
 # create the file to submit to kaggle
 knn_submission <- knn_predictions %>%
   bind_cols(.,amazon_test_data) %>%
@@ -129,7 +140,7 @@ my_randomforest_model_amazon <- rand_forest(mtry = tune(),
 
 # set workflow
 randomforest_wf_amazon <- workflow() %>%
-  add_recipe(pca_recipe) %>%
+  add_recipe(SMOTE_recipe) %>%
   add_model(my_randomforest_model_amazon)
 
 # grid of values to tune over
@@ -168,8 +179,6 @@ vroom_write(x=random_forest_submission, file ="./random_forest_Preds.csv", delim
 
 
 ## Naive bayes Classifier
-install.packages("discrim")
-install.packages("naivebayes")
 
 # nb model 
 nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
@@ -177,7 +186,7 @@ nb_model <- naive_Bayes(Laplace=tune(), smoothness=tune()) %>%
   set_engine("naivebayes")
 
 nb_wf <- workflow() %>%
-  add_recipe(pca_recipe) %>%
+  add_recipe(SMOTE_recipe) %>%
   add_model(nb_model)
 
 # tune smoothness and laplace
