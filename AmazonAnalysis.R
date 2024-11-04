@@ -48,8 +48,7 @@ amazon_train_data <- amazon_train_data %>%
 
 first_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
   step_mutate_at(all_numeric_predictors(), fn = factor) %>%
-  step_other(all_nominal_predictors(), threshold = 0.001) %>%
-  step_dummy(all_nominal_predictors())
+  step_lencode_mixed(all_nominal_predictors(), outcome = vars(ACTION))
 
 amazon_prepped_recipe <- prep(first_recipe)
 baked_amazon <- bake(amazon_prepped_recipe, new_data=amazon_train_data)
@@ -179,7 +178,7 @@ vroom_write(x=knn_submission, file ="./KNN_Preds.csv", delim=",")
 install.packages("ranger")
 my_randomforest_model_amazon <- rand_forest(mtry = tune(),
                                      min_n=tune(),
-                                     trees=500) %>%
+                                     trees=1000) %>%
   set_engine("ranger") %>%
   set_mode("classification")
 
@@ -191,13 +190,13 @@ randomforest_wf_amazon <- workflow() %>%
 # grid of values to tune over
 grid_of_randomforest_tuning_params_amazon <- grid_regular(mtry(range=c(1,10)),
                                                    min_n(),
-                                                   levels = 5)
+                                                   levels = 7)
 
 # split data for CV
 randomforest_folds_amazon <- vfold_cv(amazon_train_data, v = 10, repeats=1)
 
 # Run the CV
-randomforest_CV_results_amazon <- randomforest_wf %>%
+randomforest_CV_results_amazon <- randomforest_wf_amazon %>%
   tune_grid(resamples=randomforest_folds_amazon,
             grid=grid_of_randomforest_tuning_params_amazon,
             metrics=metric_set(roc_auc))
@@ -211,7 +210,7 @@ final_randomforest_wf_amazon <- randomforest_wf_amazon %>%
   finalize_workflow(best_randomforestTune_amazon) %>%
   fit(data=amazon_train_data)
 
-randomforest_preds <- predict(final_randomforest_wf, new_data = amazon_test_data, type = "prob")
+randomforest_preds <- predict(final_randomforest_wf_amazon, new_data = amazon_test_data, type = "prob")
 
 # create the file to submit to kaggle
 random_forest_submission <- randomforest_preds %>%

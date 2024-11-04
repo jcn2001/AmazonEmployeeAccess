@@ -271,49 +271,31 @@ svm_linear_submission <- svm_linear_preds %>%
 # write out the file
 vroom_write(x=svm_linear_submission, file ="./svm_linear_Preds.csv", delim=",")
 
+## let's try a bart model
+bart_model <- bart(
+  trees = 300,
+  prior_terminal_node_coef = NULL,
+  prior_terminal_node_expo = NULL,
+  prior_outcome_range = NULL
+) %>% 
+  set_engine("dbarts") %>% 
+  set_mode("classification") %>% 
+  translate()
 
-
-
-## polynomial model
-svmPoly <- svm_poly(degree=tune(), cost=tune()) %>%
-  set_mode("classification") %>%
-  set_engine("kernlab")
-
-svm_poly_wf <- workflow() %>%
+# set workflow
+bart_wf <- workflow() %>%
   add_recipe(pca_recipe) %>%
-  add_model(svmPoly)
-
-# tune degree and cost
-# tuning grid
-svm_poly_tuning_grid <- grid_regular(degree(),
-                                       cost(),
-                                       levels = 5)
-#folds
-svm_poly_folds <- vfold_cv(amazon_train_data, v = 10, repeats= 1)
-
-# cross-validation
-svm_poly_CV_results <- svm_poly_wf %>%
-  tune_grid(resamples=svm_poly_folds,
-            grid=svm_poly_tuning_grid,
-            metrics=metric_set(roc_auc))
-
-# pick the best tuning parameter
-best_svm_poly_tune <- svm_poly_CV_results %>%
-  select_best(metric = "roc_auc")
-
-# # Finalize the workflow and fit it
-final_svm_poly_wf <- svm_poly_wf %>%
-  finalize_workflow(best_sv_poly_tune) %>%
+  add_model(bart_model) %>%
   fit(data=amazon_train_data)
 
-# make predictions with the model
-svm_poly_preds <- predict(final_svm_poly_wf, new_data = amazon_test_data, type = "prob")
+# make the predictions
+bart_preds <- predict(bart_wf, new_data=amazon_test_data, type = "prob")
 
-# create the file to submit to kaggle
-svm_poly_submission <- svm_poly_preds %>%
+# format for kaggle
+bart_submission <- bart_preds %>%
   bind_cols(.,amazon_test_data) %>%
   select(id, .pred_1) %>%
   rename(ACTION=.pred_1)
 
 # write out the file
-vroom_write(x=svm_poly_submission, file ="./svm_poly_Preds.csv", delim=",")
+vroom_write(x=bart_submission, file="./BartPreds.csv", delim=",")
