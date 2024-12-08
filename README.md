@@ -1,2 +1,4 @@
 # AmazonEmployeeAccess
-# project number two in stat 348
+
+code for the Kaggle competition Amazon Employee Access
+
