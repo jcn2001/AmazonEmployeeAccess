@@ -73,7 +73,7 @@ logistic_submission <- log_predictions %>%
   select(id, .pred_1) %>%
   rename(ACTION=.pred_1)
 
-vroom_write(x=logistic_submission, file ="./LogisticPreds.csv", delim=",")
+vroom_write(x=logistic_submission, file ="C:/Users/Josh/Documents/stat348/AmazonEmployeeAccess/LogisticPreds.csv", delim=",")
 
 ## HW 15 Penalized Logistic Regression
 log_pen_recipe <- recipe(ACTION~.,data= amazon_train_data) %>%
